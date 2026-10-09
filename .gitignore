@@ -1,0 +1,22 @@
+
+# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment variables and secrets
+.env
+.env.*
+
+# Generated files and local database
+generated/
+*.db
+*.sqlite3
+
+# IDE and operating system
+.vscode/
+.DS_Store
