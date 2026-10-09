@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.db.database import Base, engine, get_db
 from app.models import GenerationJob, Recipient
+from app.services.job_service import process_generation_job
+
 from app.schemas import (
     CreateJobRequest,
     JobResponse,
@@ -25,6 +27,7 @@ def home():
     return {"message": "Bulk Certificate Generator API is running"}
 
 
+
 @app.post(
     "/api/jobs",
     response_model=JobResponse,
@@ -35,8 +38,8 @@ def create_job(
     db: Session = Depends(get_db),
 ):
     job = GenerationJob(
-        certificate_title=request.certificate_title,
-        organization=request.organization,
+        certificate_title=request.certificate_title.strip(),
+        organization=request.organization.strip(),
         total_recipients=len(request.recipients),
         status="PENDING",
     )
@@ -53,6 +56,9 @@ def create_job(
     db.add(job)
     db.commit()
     db.refresh(job)
+
+    # Process every recipient and update the database.
+    job = process_generation_job(job.id, db)
 
     return JobResponse(
         job_id=job.id,
