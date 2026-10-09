@@ -6,6 +6,15 @@ from app.db.database import Base, engine, get_db
 from app.models import GenerationJob, Recipient
 from app.services.job_service import process_generation_job
 
+from pathlib import Path
+
+from fastapi.responses import FileResponse, Response
+
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
+
+
 from app.schemas import (
     CreateJobRequest,
     JobResponse,
@@ -100,4 +109,92 @@ def get_job_status(
             )
             for recipient in job.recipients
         ],
+    )
+
+@app.get("/api/recipients/{recipient_id}/certificate")
+def download_certificate(
+    recipient_id: int,
+    db: Session = Depends(get_db),
+):
+    recipient = db.get(Recipient, recipient_id)
+
+    if recipient is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Recipient not found",
+        )
+
+    if recipient.status != "SUCCESS" or not recipient.file_path:
+        raise HTTPException(
+            status_code=404,
+            detail="Certificate is not available",
+        )
+
+    file_path = Path(recipient.file_path)
+
+    if not file_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="Certificate file not found",
+        )
+
+    return FileResponse(
+        path=file_path,
+        media_type="application/pdf",
+        filename=f"certificate_{recipient.id}.pdf",
+    )
+
+
+@app.get("/api/jobs/{job_id}/certificates.zip")
+def download_job_certificates(
+    job_id: int,
+    db: Session = Depends(get_db),
+):
+    job = db.get(GenerationJob, job_id)
+
+    if job is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Generation job not found",
+        )
+
+    buffer = BytesIO()
+    added_count = 0
+
+    with ZipFile(
+        buffer,
+        mode="w",
+        compression=ZIP_DEFLATED,
+    ) as archive:
+        for recipient in job.recipients:
+            if recipient.status != "SUCCESS" or not recipient.file_path:
+                continue
+
+            file_path = Path(recipient.file_path)
+
+            if not file_path.is_file():
+                continue
+
+            archive.write(
+                file_path,
+                arcname=f"certificate_{recipient.id}.pdf",
+            )
+            added_count += 1
+
+    if added_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="No generated certificates are available",
+        )
+
+    buffer.seek(0)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="job_{job.id}_certificates.zip"'
+            )
+        },
     )
