@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 
 from app.models import GenerationJob
 from app.services.certificate_service import generate_certificate
+import logging
 
+logger = logging.getLogger(__name__)
 
 OUTPUT_DIR = Path("generated")
 
@@ -47,8 +49,12 @@ def process_generation_job(
             recipient.error_message = None
 
         except Exception:
-            # Record this recipient's failure and continue
-            # processing the remaining recipients.
+            logger.exception(
+                "Certificate generation failed for recipient_id=%s, job_id=%s",
+                recipient.id,
+                job.id,
+            )
+
             recipient.status = "FAILED"
             recipient.file_path = None
             recipient.error_message = (
