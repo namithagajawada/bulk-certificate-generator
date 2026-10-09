@@ -188,6 +188,4 @@ The current implementation uses synchronous processing to keep the solution stra
 - Add pagination and configurable batch limits.
 - Add stronger email validation and more comprehensive API tests.
 
-## License
 
-Add a license if you intend to distribute the project under specific reuse terms.
